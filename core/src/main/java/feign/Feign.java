@@ -116,6 +116,7 @@ public abstract class Feign {
     private ExceptionPropagationPolicy propagationPolicy = NONE;
     private boolean forceDecoding = false;
     private List<Capability> capabilities = new ArrayList<>();
+    private LogConfiguration logConfiguration = null; // TODO: 10.06.2020 CREATE DEFAULT
 
     public Builder logLevel(Logger.Level logLevel) {
       this.logLevel = logLevel;
@@ -189,6 +190,11 @@ public abstract class Feign {
 
     public Builder errorDecoder(ErrorDecoder errorDecoder) {
       this.errorDecoder = errorDecoder;
+      return this;
+    }
+
+    public Builder logConfiguration(LogConfiguration logConfiguration) {
+      this.logConfiguration = logConfiguration;
       return this;
     }
 
@@ -283,10 +289,12 @@ public abstract class Feign {
       InvocationHandlerFactory invocationHandlerFactory =
           Capability.enrich(this.invocationHandlerFactory, capabilities);
       QueryMapEncoder queryMapEncoder = Capability.enrich(this.queryMapEncoder, capabilities);
+      LogConfiguration logConfiguration = Capability.enrich(this.logConfiguration, capabilities);
 
       SynchronousMethodHandler.Factory synchronousMethodHandlerFactory =
           new SynchronousMethodHandler.Factory(client, retryer, requestInterceptors, logger,
-              logLevel, decode404, closeAfterDecode, propagationPolicy, forceDecoding);
+              logLevel, decode404, closeAfterDecode, propagationPolicy, forceDecoding,
+              logConfiguration);
       ParseHandlersByName handlersByName =
           new ParseHandlersByName(contract, options, encoder, decoder, queryMapEncoder,
               errorDecoder, synchronousMethodHandlerFactory);

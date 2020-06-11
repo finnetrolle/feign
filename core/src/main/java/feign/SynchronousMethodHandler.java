@@ -38,6 +38,7 @@ final class SynchronousMethodHandler implements MethodHandler {
   private final List<RequestInterceptor> requestInterceptors;
   private final Logger logger;
   private final Logger.Level logLevel;
+  private final LogConfiguration logConfiguration;
   private final RequestTemplate.Factory buildTemplateFromArgs;
   private final Options options;
   private final ExceptionPropagationPolicy propagationPolicy;
@@ -53,7 +54,7 @@ final class SynchronousMethodHandler implements MethodHandler {
       RequestTemplate.Factory buildTemplateFromArgs, Options options,
       Decoder decoder, ErrorDecoder errorDecoder, boolean decode404,
       boolean closeAfterDecode, ExceptionPropagationPolicy propagationPolicy,
-      boolean forceDecoding) {
+      boolean forceDecoding, LogConfiguration logConfiguration) {
 
     this.target = checkNotNull(target, "target");
     this.client = checkNotNull(client, "client for %s", target);
@@ -66,6 +67,7 @@ final class SynchronousMethodHandler implements MethodHandler {
     this.buildTemplateFromArgs = checkNotNull(buildTemplateFromArgs, "metadata for %s", target);
     this.options = checkNotNull(options, "options for %s", target);
     this.propagationPolicy = propagationPolicy;
+    this.logConfiguration = logConfiguration;
 
     if (forceDecoding) {
       // internal only: usual handling will be short-circuited, and all responses will be passed to
@@ -75,7 +77,7 @@ final class SynchronousMethodHandler implements MethodHandler {
     } else {
       this.decoder = null;
       this.asyncResponseHandler = new AsyncResponseHandler(logLevel, logger, decoder, errorDecoder,
-          decode404, closeAfterDecode);
+          decode404, closeAfterDecode, logConfiguration);
     }
   }
 
@@ -109,6 +111,7 @@ final class SynchronousMethodHandler implements MethodHandler {
   Object executeAndDecode(RequestTemplate template, Options options) throws Throwable {
     Request request = targetRequest(template);
 
+    String requestKey = logConfiguration.logRequest(() -> request);
     if (logLevel != Logger.Level.NONE) {
       logger.logRequest(metadata.configKey(), logLevel, request);
     }
@@ -137,7 +140,7 @@ final class SynchronousMethodHandler implements MethodHandler {
     CompletableFuture<Object> resultFuture = new CompletableFuture<>();
     asyncResponseHandler.handleResponse(resultFuture, metadata.configKey(), response,
         metadata.returnType(),
-        elapsedTime);
+        elapsedTime, requestKey);
 
     try {
       if (!resultFuture.isDone())
@@ -185,10 +188,12 @@ final class SynchronousMethodHandler implements MethodHandler {
     private final boolean closeAfterDecode;
     private final ExceptionPropagationPolicy propagationPolicy;
     private final boolean forceDecoding;
+    private final LogConfiguration logConfiguration;
 
     Factory(Client client, Retryer retryer, List<RequestInterceptor> requestInterceptors,
         Logger logger, Logger.Level logLevel, boolean decode404, boolean closeAfterDecode,
-        ExceptionPropagationPolicy propagationPolicy, boolean forceDecoding) {
+        ExceptionPropagationPolicy propagationPolicy, boolean forceDecoding,
+        LogConfiguration logConfiguration) {
       this.client = checkNotNull(client, "client");
       this.retryer = checkNotNull(retryer, "retryer");
       this.requestInterceptors = checkNotNull(requestInterceptors, "requestInterceptors");
@@ -198,6 +203,7 @@ final class SynchronousMethodHandler implements MethodHandler {
       this.closeAfterDecode = closeAfterDecode;
       this.propagationPolicy = propagationPolicy;
       this.forceDecoding = forceDecoding;
+      this.logConfiguration = logConfiguration;
     }
 
     public MethodHandler create(Target<?> target,
@@ -208,7 +214,7 @@ final class SynchronousMethodHandler implements MethodHandler {
                                 ErrorDecoder errorDecoder) {
       return new SynchronousMethodHandler(target, client, retryer, requestInterceptors, logger,
           logLevel, md, buildTemplateFromArgs, options, decoder,
-          errorDecoder, decode404, closeAfterDecode, propagationPolicy, forceDecoding);
+          errorDecoder, decode404, closeAfterDecode, propagationPolicy, forceDecoding, logConfiguration);
     }
   }
 }

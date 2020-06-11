@@ -70,6 +70,7 @@ public abstract class AsyncFeign<C> extends Feign {
     private ErrorDecoder errorDecoder = new ErrorDecoder.Default();
     private boolean decode404;
     private boolean closeAfterDecode = true;
+    private final LogConfiguration logConfiguration = null; // TODO: 10.06.2020 ADD DEFAULT HERE
 
     public AsyncBuilder() {
       super();
@@ -255,7 +256,8 @@ public abstract class AsyncFeign<C> extends Feign {
         asyncBuilder.decoder,
         asyncBuilder.errorDecoder,
         asyncBuilder.decode404,
-        asyncBuilder.closeAfterDecode);
+        asyncBuilder.closeAfterDecode,
+        asyncBuilder.logConfiguration);
 
     asyncBuilder.builder.client(this::stageExecution);
     asyncBuilder.builder.decoder(this::stageDecode);

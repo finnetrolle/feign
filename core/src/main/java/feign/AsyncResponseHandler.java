@@ -34,6 +34,7 @@ class AsyncResponseHandler {
 
   private final Level logLevel;
   private final Logger logger;
+  private final LogConfiguration logConfiguration;
 
   private final Decoder decoder;
   private final ErrorDecoder errorDecoder;
@@ -41,7 +42,7 @@ class AsyncResponseHandler {
   private final boolean closeAfterDecode;
 
   AsyncResponseHandler(Level logLevel, Logger logger, Decoder decoder, ErrorDecoder errorDecoder,
-      boolean decode404, boolean closeAfterDecode) {
+      boolean decode404, boolean closeAfterDecode, LogConfiguration logConfiguration) {
     super();
     this.logLevel = logLevel;
     this.logger = logger;
@@ -49,17 +50,30 @@ class AsyncResponseHandler {
     this.errorDecoder = errorDecoder;
     this.decode404 = decode404;
     this.closeAfterDecode = closeAfterDecode;
+    this.logConfiguration = logConfiguration;
   }
 
   boolean isVoidType(Type returnType) {
     return Void.class == returnType || void.class == returnType;
   }
 
+  /**
+   * Wrapper to handle situations when we have no requestKey somewhere in code
+   */
   void handleResponse(CompletableFuture<Object> resultFuture,
                       String configKey,
                       Response response,
                       Type returnType,
                       long elapsedTime) {
+    handleResponse(resultFuture, configKey, response, returnType, elapsedTime, null);
+  }
+
+  void handleResponse(CompletableFuture<Object> resultFuture,
+                      String configKey,
+                      Response response,
+                      Type returnType,
+                      long elapsedTime,
+                      String requestKey) {
     // copied fairly liberally from SynchronousMethodHandler
     boolean shouldClose = true;
 
@@ -68,6 +82,8 @@ class AsyncResponseHandler {
         response = logger.logAndRebufferResponse(configKey, logLevel, response,
             elapsedTime);
       }
+      final Response resp = response;
+      logConfiguration.logResponse(() -> resp, elapsedTime, requestKey);
       if (Response.class == returnType) {
         if (response.body() == null) {
           resultFuture.complete(response);
