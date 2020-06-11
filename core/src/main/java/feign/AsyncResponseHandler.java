@@ -15,6 +15,8 @@ package feign;
 
 import static feign.FeignException.errorReading;
 import static feign.Util.ensureClosed;
+
+import feign.logger.FeignLogger;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.concurrent.CompletableFuture;
@@ -34,7 +36,7 @@ class AsyncResponseHandler {
 
   private final Level logLevel;
   private final Logger logger;
-  private final LogConfiguration logConfiguration;
+  private final FeignLogger feignLogger;
 
   private final Decoder decoder;
   private final ErrorDecoder errorDecoder;
@@ -42,7 +44,7 @@ class AsyncResponseHandler {
   private final boolean closeAfterDecode;
 
   AsyncResponseHandler(Level logLevel, Logger logger, Decoder decoder, ErrorDecoder errorDecoder,
-      boolean decode404, boolean closeAfterDecode, LogConfiguration logConfiguration) {
+      boolean decode404, boolean closeAfterDecode, FeignLogger feignLogger) {
     super();
     this.logLevel = logLevel;
     this.logger = logger;
@@ -50,7 +52,7 @@ class AsyncResponseHandler {
     this.errorDecoder = errorDecoder;
     this.decode404 = decode404;
     this.closeAfterDecode = closeAfterDecode;
-    this.logConfiguration = logConfiguration;
+    this.feignLogger = feignLogger;
   }
 
   boolean isVoidType(Type returnType) {
@@ -82,8 +84,7 @@ class AsyncResponseHandler {
         response = logger.logAndRebufferResponse(configKey, logLevel, response,
             elapsedTime);
       }
-      final Response resp = response;
-      logConfiguration.logResponse(() -> resp, elapsedTime, requestKey);
+      feignLogger.logResponse(requestKey, response, elapsedTime);
       if (Response.class == returnType) {
         if (response.body() == null) {
           resultFuture.complete(response);
@@ -112,6 +113,7 @@ class AsyncResponseHandler {
         resultFuture.completeExceptionally(errorDecoder.decode(configKey, response));
       }
     } catch (final IOException e) {
+      feignLogger.logIOException(requestKey, e, elapsedTime);
       if (logLevel != Level.NONE) {
         logger.logIOException(configKey, logLevel, e, elapsedTime);
       }

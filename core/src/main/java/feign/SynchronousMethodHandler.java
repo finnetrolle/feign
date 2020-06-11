@@ -13,6 +13,7 @@
  */
 package feign;
 
+import feign.logger.FeignLogger;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -38,7 +39,7 @@ final class SynchronousMethodHandler implements MethodHandler {
   private final List<RequestInterceptor> requestInterceptors;
   private final Logger logger;
   private final Logger.Level logLevel;
-  private final LogConfiguration logConfiguration;
+  private final FeignLogger feignLogger;
   private final RequestTemplate.Factory buildTemplateFromArgs;
   private final Options options;
   private final ExceptionPropagationPolicy propagationPolicy;
@@ -54,7 +55,7 @@ final class SynchronousMethodHandler implements MethodHandler {
       RequestTemplate.Factory buildTemplateFromArgs, Options options,
       Decoder decoder, ErrorDecoder errorDecoder, boolean decode404,
       boolean closeAfterDecode, ExceptionPropagationPolicy propagationPolicy,
-      boolean forceDecoding, LogConfiguration logConfiguration) {
+      boolean forceDecoding, FeignLogger feignLogger) {
 
     this.target = checkNotNull(target, "target");
     this.client = checkNotNull(client, "client for %s", target);
@@ -67,7 +68,7 @@ final class SynchronousMethodHandler implements MethodHandler {
     this.buildTemplateFromArgs = checkNotNull(buildTemplateFromArgs, "metadata for %s", target);
     this.options = checkNotNull(options, "options for %s", target);
     this.propagationPolicy = propagationPolicy;
-    this.logConfiguration = logConfiguration;
+    this.feignLogger = feignLogger;
 
     if (forceDecoding) {
       // internal only: usual handling will be short-circuited, and all responses will be passed to
@@ -77,7 +78,7 @@ final class SynchronousMethodHandler implements MethodHandler {
     } else {
       this.decoder = null;
       this.asyncResponseHandler = new AsyncResponseHandler(logLevel, logger, decoder, errorDecoder,
-          decode404, closeAfterDecode, logConfiguration);
+          decode404, closeAfterDecode, feignLogger);
     }
   }
 
@@ -100,6 +101,7 @@ final class SynchronousMethodHandler implements MethodHandler {
             throw th;
           }
         }
+        feignLogger.logRetry(null);
         if (logLevel != Logger.Level.NONE) {
           logger.logRetry(metadata.configKey(), logLevel);
         }
@@ -111,7 +113,7 @@ final class SynchronousMethodHandler implements MethodHandler {
   Object executeAndDecode(RequestTemplate template, Options options) throws Throwable {
     Request request = targetRequest(template);
 
-    String requestKey = logConfiguration.logRequest(() -> request);
+    String requestKey = feignLogger.logRequest(request);
     if (logLevel != Logger.Level.NONE) {
       logger.logRequest(metadata.configKey(), logLevel, request);
     }
@@ -126,6 +128,7 @@ final class SynchronousMethodHandler implements MethodHandler {
           .requestTemplate(template)
           .build();
     } catch (IOException e) {
+      feignLogger.logIOException(requestKey, e, elapsedTime(start));
       if (logLevel != Logger.Level.NONE) {
         logger.logIOException(metadata.configKey(), logLevel, e, elapsedTime(start));
       }
@@ -188,12 +191,12 @@ final class SynchronousMethodHandler implements MethodHandler {
     private final boolean closeAfterDecode;
     private final ExceptionPropagationPolicy propagationPolicy;
     private final boolean forceDecoding;
-    private final LogConfiguration logConfiguration;
+    private final FeignLogger feignLogger;
 
     Factory(Client client, Retryer retryer, List<RequestInterceptor> requestInterceptors,
         Logger logger, Logger.Level logLevel, boolean decode404, boolean closeAfterDecode,
         ExceptionPropagationPolicy propagationPolicy, boolean forceDecoding,
-        LogConfiguration logConfiguration) {
+        FeignLogger feignLogger) {
       this.client = checkNotNull(client, "client");
       this.retryer = checkNotNull(retryer, "retryer");
       this.requestInterceptors = checkNotNull(requestInterceptors, "requestInterceptors");
@@ -203,7 +206,7 @@ final class SynchronousMethodHandler implements MethodHandler {
       this.closeAfterDecode = closeAfterDecode;
       this.propagationPolicy = propagationPolicy;
       this.forceDecoding = forceDecoding;
-      this.logConfiguration = logConfiguration;
+      this.feignLogger = feignLogger;
     }
 
     public MethodHandler create(Target<?> target,
@@ -214,7 +217,7 @@ final class SynchronousMethodHandler implements MethodHandler {
                                 ErrorDecoder errorDecoder) {
       return new SynchronousMethodHandler(target, client, retryer, requestInterceptors, logger,
           logLevel, md, buildTemplateFromArgs, options, decoder,
-          errorDecoder, decode404, closeAfterDecode, propagationPolicy, forceDecoding, logConfiguration);
+          errorDecoder, decode404, closeAfterDecode, propagationPolicy, forceDecoding, feignLogger);
     }
   }
 }

@@ -14,6 +14,8 @@
 package feign;
 
 import com.google.gson.reflect.TypeToken;
+import feign.logger.DefaultRequestFormatter;
+import feign.logger.LoggerConfiguration;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import org.junit.Rule;
@@ -22,6 +24,9 @@ import java.lang.reflect.Type;
 import java.util.List;
 import feign.codec.Decoder;
 import feign.codec.Encoder;
+import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
+
 import static feign.assertj.MockWebServerAssertions.assertThat;
 
 public class BaseApiTest {
@@ -57,6 +62,38 @@ public class BaseApiTest {
   interface MyApi extends BaseApi<String, Long> {
 
   }
+
+
+  // TODO: 10.06.2020 MOVE TO BETTER PLACE
+  @Test
+  public void testLog() throws InterruptedException {
+    server.enqueue(new MockResponse().setBody("foo"));
+
+    String baseUrl = server.url("/default").toString();
+
+    Feign.builder()
+        .logger(LoggerConfiguration.forLogger(LoggerFactory.getLogger("TestAPI"))
+            .withRequest(DefaultRequestFormatter.builder()
+                .withHeaders()
+                .withBody()
+                .build())
+            .withResponse()
+            .overrideLevel(Level.INFO)
+            .build())
+        .decoder(new Decoder() {
+          @Override
+          public Object decode(Response response, Type type) {
+            assertThat(type)
+                .isEqualTo(new TypeToken<Entity<String, Long>>() {}.getType());
+            return null;
+          }
+        })
+        .target(MyApi.class, baseUrl).get("foo");
+
+    assertThat(server.takeRequest()).hasPath("/default/api/foo");
+
+  }
+
 
   @Test
   public void resolvesParameterizedResult() throws InterruptedException {

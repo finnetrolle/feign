@@ -13,6 +13,7 @@
  */
 package feign;
 
+import feign.logger.FeignLogger;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.Optional;
@@ -70,7 +71,7 @@ public abstract class AsyncFeign<C> extends Feign {
     private ErrorDecoder errorDecoder = new ErrorDecoder.Default();
     private boolean decode404;
     private boolean closeAfterDecode = true;
-    private final LogConfiguration logConfiguration = null; // TODO: 10.06.2020 ADD DEFAULT HERE
+    private final FeignLogger feignLogger = null; // TODO: 10.06.2020 ADD DEFAULT HERE
 
     public AsyncBuilder() {
       super();
@@ -257,7 +258,7 @@ public abstract class AsyncFeign<C> extends Feign {
         asyncBuilder.errorDecoder,
         asyncBuilder.decode404,
         asyncBuilder.closeAfterDecode,
-        asyncBuilder.logConfiguration);
+        asyncBuilder.feignLogger);
 
     asyncBuilder.builder.client(this::stageExecution);
     asyncBuilder.builder.decoder(this::stageDecode);
